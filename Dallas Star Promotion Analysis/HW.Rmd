@@ -1,0 +1,205 @@
+---
+title: "Dallas Stars Promotion Analysis"
+output: pdf_document
+author: "Vandana Jain"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(reticulate)
+```
+
+```{python, echo=FALSE}
+# Python setup
+import pandas as pd
+import numpy as np
+from scipy.stats import chi2_contingency
+from scipy.stats import ttest_ind
+from statsmodels.stats.proportion import proportion_confint
+from scipy.stats import norm, sem
+
+#Importing the data
+df = pd.read_csv('dallasStars.csv')
+```
+
+### Executive Summary
+
+The report summarizes the findings of a test carried out to understand the efficacy of different promotion campaigns catering to fans of the Dallas Stars game. Based on the test results, it can be concluded that there is value in providing monetary incentives to guests i.e. free drink or food voucher in our case. We tracked response rates, ticket and concession revenue net of any promotion costs. Based on the incremental value of the promotions in the test, I recommend that offering a free themed drink would be the best promotion strategy for any future campaigns.
+
+The validity of this recommendation is subject to some variables not controlled for during the test. This test was carried out on St. Patrick Day theme and its applicability on other occasions cannot be warranted. Another factor would be the popularity of the team at the time test was carried out.
+
+### Background Analysis
+
+The test comprised of three different populations with a sample size of 500 each.
+
+| Offer   | Sample Size | Response Rate | Ticket Revenue | Concession Revenue |
+|---------|:-----------:|:-------------:|:--------------:|:------------------:|
+| Control |     500     |      19%      |    \$12,275    |      \$1,888       |
+| Drink   |     500     |     22.8%     |    \$21,562    |      \$1,618       |
+| Food    |     500     |     30.4%     |    \$21,102    |      \$1,218       |
+
+To understand if offering drink or food had any impact on the response rate, I carried out Chi-squared test. The test indicated that offering food voucher led to a statistically significant outcome different from both control and drink campaigns. Thus, we can safely conclude that offering food voucher led to higher response rates from fans.
+
+To compare the mean ticket and concession revenues, Welch's T Test was preferred because of unequal sample sizes. The test results showed that mean ticket revenue is highest for drink campaign and is independent of revenues for both control and food treatments.
+
+Similarly, it was found the control test had the highest concession revenue. The difference in mean concession revenue can somewhat be explained by the promotions themselves. We lost \$10 in revenues due to the food voucher and drink revenue in the drink promotion.
+
+After accounting for promotion costs, I calculated the net revenues from all three promotions:
+
+| Offer   | Mean Ticket Revenue | Mean Concession Revenue | Promo Cost | Mail Cost | Net Revenue  |
+|------------|:----------:|:----------:|:----------:|:----------:|:----------:|
+| Control |        \$129        |         \$19.87         |    \$0     |   \$500   |   \$13,663   |
+| Drink   |        \$189        |         \$14.19         |    \$2     |   \$500   | **\$22,452** |
+| Food    |        \$139        |         \$8.01          |    \$6     |   \$500   |   \$20,908   |
+
+Based on the net revenue, I was able to conclude that most value was achieved from the drink treatment. Using confidence intervals for various values for the drink promotion, I was able to calculate the 95% confidence interval for expected net revenue for each mail sent with drink promotion to be \$36.50-\$53.69.
+
+### Recommendation
+
+Based on the above analysis, I concluded that the drink promotion generated the highest value among the three treatments. Most of this value is derived from higher average ticket revenue.
+
+### Risks and Next steps
+
+The above recommendation is vulnerable due to the following limitations of the test:
+
+-   We have no way of knowing whether the higher ticket revenue in drink treatment was due to multiple tickets or better seat preference.
+
+-   If the themed drink offered was related to St. Patrick's day, it will cast doubt on applicability of this test for periods other than around St. Patrick's day.
+
+-   No context was provided around the relative popularity of Dallas stars team during the test period. We are not sure if there was/wasn't any competing event during the promotion period.
+
+To achieve the best results using the above recommendation, following steps should be followed:
+
+-   Number of tickets and seat preference should be noted for any future promotion responses.
+
+-   A test should be considered to understand the relationship between type of drink (in terms of theme and flavor) offered to fans and resulting value.
+
+-   Historical data of turnout should be studied looking for correlations with team popularity and competing events.
+
+## Appendix
+
+#### Preliminary Analysis
+
+To understand the outcome of various treatments, various metrics for each treatment were calculated.
+
+```{python, echo=FALSE}
+df_response = df.groupby('offer').agg({'id': 'count', 'responded': 'sum', 'ticket': 'sum', 'concession': 'sum'}).reset_index()
+df_response['response_pct'] = df_response.responded / df_response.id
+df_response['ticket_mean'] = df_response.ticket / df_response.responded
+df_response['concession_mean'] = df_response.concession / df_response.responded
+print(df_response[['offer', 'id', 'responded', 'response_pct']])
+print(df_response[['offer', 'ticket', 'ticket_mean', 'concession', 'concession_mean']])
+```
+
+The highest response rate was achieved through food voucher promotion. To be able to say the results for response rates were statistically different from each other, Chi-squared test was carried out.
+
+#### Analyzing campaign response rate uniqueness through Chi-squared Test
+
+[Null Hypothesis:]{.underline} All treatments are equally effective
+
+[Alternate Hypothesis:]{.underline} At least one treatment has a different impact
+
+```{python, echo=FALSE}
+contigency = pd.crosstab(df['responded'], df['offer'])
+c, p, dof, expected = chi2_contingency(contigency)
+print('p-value for chi-sq test:', p)
+```
+
+At 95% confidence level, I can conclude that at least one promotion had unique impact. To differentiate between all the three populations, I carried out pairwise Chi-squared test for all the possible combinations.
+
+```{python, echo=FALSE}
+df_filtered = df[df.offer.isin(['control', 'drink'])]
+contigency = pd.crosstab(df_filtered['responded'], df_filtered['offer'])
+c, p, dof, expected = chi2_contingency(contigency)
+print('p-value for chi-sq test (Contol and Drink):', p)
+df_filtered = df[df.offer.isin(['control', 'food'])]
+contigency = pd.crosstab(df_filtered['responded'], df_filtered['offer'])
+c, p, dof, expected = chi2_contingency(contigency)
+print('p-value for chi-sq test (Contol and Food):', p)
+df_filtered = df[df.offer.isin(['food', 'drink'])]
+contigency = pd.crosstab(df_filtered['responded'], df_filtered['offer'])
+c, p, dof, expected = chi2_contingency(contigency)
+print('p-value for chi-sq test (Food and Drink):', p)
+```
+
+I found out that response rates for Control and Drink populations are not statistically different at 95% confidence level. However, the response rate for the Food population is unique and different from both Control and Drink populations. Thus, we can conclude that food voucher has been most effective at eliciting response from the customers.
+
+#### Ticket Revenue distribution comparison using Welch's T Test
+
+Since I have three samples of differing sizes and continuous distributions, I opted for Welch's T Test to compare the distribution of ticket revenues.
+
+```{python, echo=FALSE}
+df_responded = df[df.responded == 1]
+control = df_responded[df_responded.offer == 'control'].ticket.values
+drink = df_responded[df_responded.offer == 'drink'].ticket.values
+food = df_responded[df_responded.offer == 'food'].ticket.values
+print('Welchs T-Test result for Control and Drink')
+print(ttest_ind(control, drink , equal_var = False))
+print('Welchs T-Test result for Control and Food')
+print(ttest_ind(control, food , equal_var = False))
+print('Welchs T-Test result for Food and Drink')
+print(ttest_ind(food, drink , equal_var = False))
+```
+
+The p-values indicate that there is no significant difference between the mean ticket revenue for Control and Food offer population. However, the mean ticket revenue for the Drink offer population is different from that of both control and food offer population. Thus, we can conclude that Drink offer had the highest mean ticket revenue among the three.
+
+#### Concession Revenue distribution comparison using Welch's T Test
+
+Similarly I carried out another test to compare the distribution of concession revenues.
+
+```{python, echo=FALSE}
+df_responded = df[df.responded == 1]
+control = df_responded[df_responded.offer == 'control'].concession.values
+drink = df_responded[df_responded.offer == 'drink'].concession.values
+food = df_responded[df_responded.offer == 'food'].concession.values
+print('Welchs T-Test result for Control and Drink')
+print(ttest_ind(control, drink , equal_var = False))
+print('Welchs T-Test result for Control and Food')
+print(ttest_ind(control, food , equal_var = False))
+print('Welchs T-Test result for Food and Drink')
+print(ttest_ind(food, drink , equal_var = False))
+```
+
+A very low p-value suggests that these results are unique and control test had the highest mean concession revenue.
+
+#### Promotion Profitability Analysis
+
+Profitability for the promotions was calculated as follows:
+
+Test Revenue after promotion costs = Generated Revenue(Ticket + Concessions) - Promotion Mailing Cost - Promotion Offer Cost
+
+The drink promotion generated the most revenue out of the three.
+
+```{python, echo=FALSE}
+df_response['promo_mail_cost'] = 500
+df_response['promo_offer_unit_cost'] = 0
+df_response.loc[df_response.offer == 'drink', 'promo_offer_unit_cost'] = 2
+df_response.loc[df_response.offer == 'food', 'promo_offer_unit_cost'] = 6
+df_response['promo_offer_cost'] = df_response['promo_offer_unit_cost'] * df_response['responded']
+df_response['promo_revenue'] = df_response['ticket'] + df_response['concession'] - df_response['promo_mail_cost'] - df_response['promo_offer_cost']
+print(df_response[['offer', 'promo_mail_cost', 'promo_offer_unit_cost', 'promo_offer_cost', 'promo_revenue']])
+```
+
+To get a 95% confidence interval for expected revenue for each mail sent with the drink offer, I calculated confidence intervals for the response rate, mean ticket revenue and mean concession revenue.
+
+```{python, echo=FALSE}
+drink_cost = 2
+mail_unit_cost = 1
+df_responded = df[df.responded == 1]
+drink_tkt = df_responded[df_responded.offer == 'drink'].ticket.values
+drink_con = df_responded[df_responded.offer == 'drink'].concession.values
+
+res_rate_low, res_rate_high = proportion_confint(114, 500, alpha=(1 - 0.95))
+print('Response Rate 95% CI: ({}, {})'.format(res_rate_low, res_rate_high))
+
+drink_tkt_low, drink_tkt_high = norm.interval(alpha=0.95, loc=np.mean(drink_tkt), scale=sem(drink_tkt))
+print('Mean Ticket Revenue 95% CI: ({}, {})'.format(drink_tkt_low, drink_tkt_high))
+
+drink_con_low, drink_con_high = norm.interval(alpha=0.95, loc=np.mean(drink_con), scale=sem(drink_con))
+print('Mean Concession Revenue 95% CI: ({}, {})'.format(drink_con_low, drink_con_high))
+
+exp_rev_low = res_rate_low * (drink_tkt_low + drink_con_low- drink_cost) - mail_unit_cost
+exp_rev_high = res_rate_high * (drink_tkt_high + drink_con_high - drink_cost) - mail_unit_cost
+
+print('Expected Revenue per mail 95% CI: ({}, {})'.format(exp_rev_low, exp_rev_high))
+```
